@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Generator Ikonografiki</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div>
+        <h1>Generator Ikonografiki</h1>
+        <p>Wczytaj lokalny JSON i wygeneruj obraz.</p>
+      </div>
+      <div class="controls">
+        <label class="select">
+          <span>Aspect</span>
+          <select id="aspectSelect">
+            <option value="16:9">16:9</option>
+            <option value="4:3">4:3</option>
+            <option value="1:1">1:1</option>
+            <option value="3:4">3:4</option>
+            <option value="9:16">9:16</option>
+          </select>
+        </label>
+        <label class="select">
+          <span>Kolorystyka</span>
+          <select id="presetSelect"></select>
+        </label>
+        <label class="file">
+          <input id="jsonFile" type="file" accept="application/json" />
+          <span>Wybierz JSON</span>
+        </label>
+        <button id="renderBtn" type="button">Renderuj</button>
+        <button id="savePng" type="button">Zapisz PNG</button>
+        <button id="saveJpeg" type="button">Zapisz JPEG</button>
+      </div>
+    </header>
+
+    <section class="info">
+      <div id="status">Brak wczytanego pliku.</div>
+      <div id="overflow"></div>
+    </section>
+
+    <section class="dropzone" id="dropzone">
+      <div class="dropzone-inner">
+        <div class="dropzone-title">Przeciągnij i upuść plik JSON tutaj</div>
+        <div class="dropzone-sub">albo użyj przycisku „Wybierz JSON”</div>
+      </div>
+    </section>
+
+    <section class="canvas-wrap">
+      <canvas id="canvas" width="1920" height="1080"></canvas>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

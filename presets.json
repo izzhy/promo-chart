@@ -1,0 +1,14 @@
+{
+  "presets": [
+    {"name": "Dominus Blue", "dominantColor": "#2E6AA8", "cardColor": "#DCE8FF"},
+    {"name": "Biały", "dominantColor": "#F2F2F2", "cardColor": "#FFFFFF"},
+    {"name": "Czarny", "dominantColor": "#0F1117", "cardColor": "#20242E"},
+    {"name": "Apple Like", "dominantColor": "#DCE1E7", "cardColor": "#F5F6F7"},
+    {"name": "Promo (Złoty)", "dominantColor": "#C8A14A", "cardColor": "#F4E6C0"},
+    {"name": "Emerald Forest", "dominantColor": "#2F8F6B", "cardColor": "#D7F0E4"},
+    {"name": "Amber Glow", "dominantColor": "#C9852B", "cardColor": "#FFE3B0"},
+    {"name": "Rose Quartz", "dominantColor": "#C86C8A", "cardColor": "#F6D6DF"},
+    {"name": "Deep Violet", "dominantColor": "#5A4BA6", "cardColor": "#E1DDF6"},
+    {"name": "Slate Teal", "dominantColor": "#3B6C7A", "cardColor": "#D3E6EB"}
+  ]
+}

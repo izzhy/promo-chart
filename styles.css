@@ -1,0 +1,148 @@
+:root {
+  --bg: #0b1633;
+  --panel: #111b3d;
+  --text: #f2f4ff;
+  --muted: #b9c0dd;
+  --accent: #6aa6ff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  background: radial-gradient(1200px 800px at 20% 10%, #152552, #0b1633);
+  color: var(--text);
+}
+
+.page {
+  max-width: 1200px;
+  margin: 24px auto 48px;
+  padding: 0 20px;
+}
+
+.topbar {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #111b3d, #0c1635);
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+}
+
+.topbar h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  letter-spacing: 0.4px;
+}
+
+.topbar p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+button, .file span {
+  background: linear-gradient(135deg, #2d3b7a, #1d2b63);
+  color: #fff;
+  border: 1px solid #3c4d8a;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #2d3b7a, #1d2b63);
+  border: 1px solid #3c4d8a;
+  border-radius: 10px;
+  padding: 6px 10px;
+  color: #fff;
+  font-size: 13px;
+}
+
+.select select {
+  background: transparent;
+  color: #fff;
+  border: none;
+  outline: none;
+  font-size: 13px;
+}
+
+.select option {
+  color: #111;
+}
+button:hover, .file span:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+}
+
+button:active, .file span:active {
+  transform: translateY(0);
+}
+
+.file input {
+  display: none;
+}
+
+.info {
+  display: flex;
+  justify-content: space-between;
+  margin: 14px 6px 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.canvas-wrap {
+  background: #0a1330;
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+
+.dropzone {
+  margin: 8px 0 14px;
+  border: 2px dashed rgba(255,255,255,0.25);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+  background: rgba(10, 19, 48, 0.55);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.dropzone.is-dragging {
+  border-color: var(--accent);
+  background: rgba(26, 46, 96, 0.6);
+  color: #fff;
+}
+
+.dropzone-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dropzone-sub {
+  font-size: 12px;
+  margin-top: 4px;
+}
+canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 14px;
+  background: #0b1633;
+}
