@@ -6,18 +6,37 @@ const savePng = document.getElementById("savePng");
 const saveJpeg = document.getElementById("saveJpeg");
 const presetSelect = document.getElementById("presetSelect");
 const aspectSelect = document.getElementById("aspectSelect");
+const fontSelect = document.getElementById("fontSelect");
 const dropzone = document.getElementById("dropzone");
+const logoDropzone = document.getElementById("logoDropzone");
+const themeToggle = document.getElementById("themeToggle");
+const commentAuthor = document.getElementById("commentAuthor");
+const commentText = document.getElementById("commentText");
+const commentReactions = document.getElementById("commentReactions");
+const addCommentBtn = document.getElementById("addCommentBtn");
+const editCancelBtn = document.getElementById("editCancelBtn");
+const commentList = document.getElementById("commentList");
+const commentCount = document.getElementById("commentCount");
 const statusEl = document.getElementById("status");
 const overflowEl = document.getElementById("overflow");
 
 const DEFAULT_COLOR = "#2E6AA8";
+const DEFAULT_FONT = "Trebuchet MS";
 const CANVAS_W = 1920;
 const BASE_CELL_H = 235;
+const STORED_COMMENTS_KEY = "storedComments";
+const LEGACY_COMMENTS_KEY = "localComments";
 
 let currentData = null;
 let presets = [];
+let editingComment = null;
+let commentEdits = {};
 
 loadPresets();
+initTheme();
+loadLocalComments();
+loadLocalEdits();
+initFont();
 
 presetSelect.addEventListener("change", () => {
   if (currentData) renderScene(currentData);
@@ -26,6 +45,13 @@ presetSelect.addEventListener("change", () => {
 aspectSelect.addEventListener("change", () => {
   if (currentData) renderScene(currentData);
 });
+
+if (fontSelect) {
+  fontSelect.addEventListener("change", async () => {
+    localStorage.setItem("canvasFont", fontSelect.value);
+    if (currentData) await renderScene(currentData);
+  });
+}
 
 jsonFile.addEventListener("change", async (e) => {
   const file = e.target.files[0];
@@ -41,37 +67,204 @@ renderBtn.addEventListener("click", async () => {
   await renderScene(currentData);
 });
 
+addCommentBtn.addEventListener("click", async () => {
+  const text = (commentText.value || "").trim();
+  const author = (commentAuthor.value || "").trim();
+  if (!text) {
+    statusEl.textContent = "Dodaj treść komentarza.";
+    return;
+  }
+  const reactionsRaw = (commentReactions.value || "").trim();
+  const reactions = reactionsRaw === "" ? undefined : Number(reactionsRaw);
+
+  if (!currentData) currentData = { comments: [] };
+  if (!Array.isArray(currentData.comments)) currentData.comments = [];
+
+  if (editingComment) {
+    const idx = currentData.comments.indexOf(editingComment);
+    if (idx === -1) {
+      statusEl.textContent = "Nie można zapisać: komentarz nie istnieje.";
+      exitEditMode();
+      return;
+    }
+    const wasLocal = currentData.comments[idx]?._local === true;
+    currentData.comments[idx].author = author;
+    currentData.comments[idx].comment = text;
+    if (Number.isFinite(reactions)) {
+      currentData.comments[idx].numberOfReaction = reactions;
+    } else {
+      delete currentData.comments[idx].numberOfReaction;
+    }
+    if (wasLocal) currentData.comments[idx]._local = true;
+    if (!wasLocal && currentData.comments[idx]._editKey) {
+      commentEdits[currentData.comments[idx]._editKey] = {
+        author,
+        comment: text,
+        numberOfReaction: Number.isFinite(reactions) ? reactions : null,
+      };
+      saveLocalEdits(commentEdits);
+    }
+    statusEl.textContent = "Zapisano zmiany.";
+    exitEditMode();
+  } else {
+    const item = {
+      author,
+      comment: text,
+    };
+    if (Number.isFinite(reactions)) item.numberOfReaction = reactions;
+    item._local = true;
+    currentData.comments.push(item);
+    statusEl.textContent = "Dodano komentarz.";
+  }
+
+  saveLocalComments(currentData.comments);
+  commentText.value = "";
+  commentReactions.value = "";
+  renderCommentList(currentData.comments);
+  await renderScene(currentData);
+});
+
 dropzone.addEventListener("dragover", (e) => {
   e.preventDefault();
-  dropzone.classList.add("is-dragging");
+  setDropzoneActive(dropzone, true);
 });
 
 dropzone.addEventListener("dragleave", () => {
-  dropzone.classList.remove("is-dragging");
+  setDropzoneActive(dropzone, false);
 });
 
 dropzone.addEventListener("drop", async (e) => {
   e.preventDefault();
-  dropzone.classList.remove("is-dragging");
+  setDropzoneActive(dropzone, false);
   const file = e.dataTransfer?.files?.[0];
   if (!file) return;
   await loadJsonFile(file);
 });
 
-savePng.addEventListener("click", () => {
-  downloadCanvas("image/png", "ikonografika.png");
+logoDropzone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  setDropzoneActive(logoDropzone, true);
 });
 
-saveJpeg.addEventListener("click", () => {
-  downloadCanvas("image/jpeg", "ikonografika.jpg", 0.92);
+logoDropzone.addEventListener("dragleave", () => {
+  setDropzoneActive(logoDropzone, false);
 });
 
-function downloadCanvas(type, filename, quality) {
-  const dataUrl = canvas.toDataURL(type, quality);
+logoDropzone.addEventListener("drop", async (e) => {
+  e.preventDefault();
+  setDropzoneActive(logoDropzone, false);
+  const file = e.dataTransfer?.files?.[0];
+  if (!file) return;
+  await loadLogoFile(file);
+});
+
+savePng.addEventListener("click", async () => {
+  await exportCanvas("image/png", "ikonografika.png");
+});
+
+saveJpeg.addEventListener("click", async () => {
+  await exportCanvas("image/jpeg", "ikonografika.jpg", 0.92);
+});
+
+if (editCancelBtn) {
+  editCancelBtn.addEventListener("click", () => {
+    exitEditMode();
+    commentAuthor.value = "";
+    commentText.value = "";
+    commentReactions.value = "";
+    statusEl.textContent = "Anulowano edycję.";
+  });
+}
+
+async function exportCanvas(type, filename, quality) {
+  try {
+    triggerDownload(canvas.toDataURL(type, quality), filename);
+  } catch (err) {
+    const isSecurity = String(err?.name || "").includes("Security") || String(err?.message || "").includes("taint");
+    if (isSecurity && currentData?.logo) {
+      statusEl.textContent = "Eksport: pomijam logo (CORS) i próbuję ponownie.";
+      const savedLogo = currentData.logo;
+      const tmp = { ...currentData, logo: null };
+      await renderScene(tmp);
+      try {
+        triggerDownload(canvas.toDataURL(type, quality), filename);
+      } catch {
+        statusEl.textContent = "Eksport nieudany: przeglądarka blokuje zapis.";
+      }
+      await renderScene(currentData);
+      currentData.logo = savedLogo;
+    } else {
+      statusEl.textContent = "Eksport nieudany: przeglądarka blokuje zapis.";
+    }
+  }
+}
+
+function triggerDownload(dataUrl, filename) {
   const link = document.createElement("a");
   link.href = dataUrl;
   link.download = filename;
   link.click();
+}
+
+function setDropzoneActive(el, isActive) {
+  if (!el) return;
+  if (isActive) {
+    el.classList.add("ring-2", "ring-slate-900/10", "border-slate-400", "bg-slate-50");
+  } else {
+    el.classList.remove("ring-2", "ring-slate-900/10", "border-slate-400", "bg-slate-50");
+  }
+}
+
+function initTheme() {
+  const stored = localStorage.getItem("theme");
+  if (stored === "dark") document.documentElement.classList.add("dark");
+  updateThemeButton();
+  themeToggle.addEventListener("click", () => {
+    document.documentElement.classList.toggle("dark");
+    localStorage.setItem("theme", document.documentElement.classList.contains("dark") ? "dark" : "light");
+    updateThemeButton();
+  });
+}
+
+function updateThemeButton() {
+  const isDark = document.documentElement.classList.contains("dark");
+  themeToggle.textContent = isDark ? "Light" : "Dark";
+}
+
+function initFont() {
+  if (!fontSelect) return;
+  const stored = localStorage.getItem("canvasFont");
+  if (stored && Array.from(fontSelect.options).some((opt) => opt.value === stored)) {
+    fontSelect.value = stored;
+  }
+}
+
+function getCanvasFontFamily() {
+  return fontSelect?.value || DEFAULT_FONT;
+}
+
+function normalizeFontFamily(family) {
+  const trimmed = (family || DEFAULT_FONT).trim();
+  if (/[,"']/.test(trimmed)) return trimmed;
+  if (/\s/.test(trimmed)) return `"${trimmed}"`;
+  return trimmed;
+}
+
+function buildCanvasFont(size, weight = "") {
+  const primary = normalizeFontFamily(getCanvasFontFamily());
+  const fallback = `"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+  const prefix = weight ? `${weight} ` : "";
+  return `${prefix}${size}px ${primary}, ${fallback}`;
+}
+
+async function ensureCanvasFontLoaded() {
+  const family = normalizeFontFamily(getCanvasFontFamily());
+  if (!document.fonts?.load) return;
+  try {
+    await document.fonts.load(`16px ${family}`);
+  } catch {
+    // Ignore font loading errors and continue with fallbacks.
+  }
 }
 
 async function loadJsonFile(file) {
@@ -79,17 +272,197 @@ async function loadJsonFile(file) {
     const text = await file.text();
     const data = JSON.parse(text);
     currentData = data;
+    applyLocalEdits(currentData?.comments);
+    exitEditMode();
     statusEl.textContent = `Wczytano: ${file.name}`;
     overflowEl.textContent = "";
+    renderCommentList(Array.isArray(currentData?.comments) ? currentData.comments : []);
+    saveLocalComments(Array.isArray(currentData?.comments) ? currentData.comments : []);
     await renderScene(currentData);
   } catch (err) {
     statusEl.textContent = "Błąd: niepoprawny JSON.";
     overflowEl.textContent = "";
     currentData = null;
+    exitEditMode();
   }
 }
 
+async function loadLogoFile(file) {
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    currentData = currentData || { comments: [] };
+    currentData.logo = dataUrl;
+    statusEl.textContent = `Logo wczytane: ${file.name}`;
+    await renderScene(currentData);
+  } catch {
+    statusEl.textContent = "Błąd: nie można wczytać logo.";
+  }
+}
+
+function loadLocalComments() {
+  const stored = localStorage.getItem(STORED_COMMENTS_KEY);
+  if (!stored) {
+    const legacy = localStorage.getItem(LEGACY_COMMENTS_KEY);
+    if (!legacy) return;
+    try {
+      const parsedLegacy = JSON.parse(legacy);
+      if (!Array.isArray(parsedLegacy)) return;
+      currentData = { comments: parsedLegacy };
+      saveLocalComments(parsedLegacy);
+      renderCommentList(parsedLegacy);
+    } catch {
+      // ignore
+    }
+    return;
+  }
+  try {
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return;
+    currentData = { comments: parsed };
+    renderCommentList(parsed);
+  } catch {
+    // ignore
+  }
+}
+
+function saveLocalComments(comments) {
+  try {
+    const safe = Array.isArray(comments) ? comments : [];
+    localStorage.setItem(STORED_COMMENTS_KEY, JSON.stringify(safe));
+  } catch {
+    // ignore
+  }
+}
+
+function mergeLocalComments() {}
+
+function loadLocalEdits() {
+  const stored = localStorage.getItem("commentEdits");
+  if (!stored) return;
+  try {
+    const parsed = JSON.parse(stored);
+    if (parsed && typeof parsed === "object") commentEdits = parsed;
+  } catch {
+    // ignore
+  }
+}
+
+function saveLocalEdits(edits) {
+  try {
+    localStorage.setItem("commentEdits", JSON.stringify(edits || {}));
+  } catch {
+    // ignore
+  }
+}
+
+function makeEditKey(comment, index) {
+  const author = typeof comment?.author === "string" ? comment.author : "";
+  const text = typeof comment?.comment === "string" ? comment.comment : "";
+  const reactions = Number.isFinite(comment?.numberOfReaction) ? comment.numberOfReaction : "";
+  return `${index}|${author}|${text}|${reactions}`;
+}
+
+function ensureEditKeys(comments) {
+  comments.forEach((c, idx) => {
+    if (!c || c._local === true) return;
+    if (!c._editKey) c._editKey = makeEditKey(c, idx);
+  });
+}
+
+function applyLocalEdits(comments) {
+  if (!Array.isArray(comments)) return;
+  ensureEditKeys(comments);
+  comments.forEach((c) => {
+    if (!c || c._local === true) return;
+    const key = c._editKey;
+    if (!key) return;
+    const edit = commentEdits[key];
+    if (!edit || typeof edit !== "object") return;
+    if (typeof edit.author === "string") c.author = edit.author;
+    if (typeof edit.comment === "string") c.comment = edit.comment;
+    if ("numberOfReaction" in edit) {
+      if (edit.numberOfReaction === null) {
+        delete c.numberOfReaction;
+      } else {
+        c.numberOfReaction = edit.numberOfReaction;
+      }
+    }
+  });
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("read"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderCommentList(comments) {
+  if (!commentList || !commentCount) return;
+  commentList.innerHTML = "";
+  commentCount.textContent = `${comments.length}`;
+  ensureEditKeys(comments);
+  comments.forEach((c, idx) => {
+    const row = document.createElement("div");
+    row.className = "flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100";
+
+    const left = document.createElement("div");
+    const author = (c?.author || "Anonymous").trim() || "Anonymous";
+    const text = typeof c?.comment === "string" ? c.comment : "";
+    const reactions = Number.isFinite(c?.numberOfReaction) ? ` • ${c.numberOfReaction}` : "";
+    left.textContent = `${author}: ${text}${reactions}`;
+
+    const actions = document.createElement("div");
+    actions.className = "flex items-center gap-2";
+
+    const edit = document.createElement("button");
+    edit.className = "text-xs rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-700 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200";
+    edit.textContent = "Edytuj";
+    edit.addEventListener("click", () => {
+      enterEditMode(c);
+    });
+    actions.appendChild(edit);
+
+    const del = document.createElement("button");
+    del.className = "text-xs rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-700 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200";
+    del.textContent = "Usuń";
+    del.addEventListener("click", async () => {
+      if (!currentData || !Array.isArray(currentData.comments)) return;
+      if (editingComment === c) exitEditMode();
+      currentData.comments.splice(idx, 1);
+      saveLocalComments(currentData.comments);
+      renderCommentList(currentData.comments);
+      await renderScene(currentData);
+    });
+
+    row.appendChild(left);
+    actions.appendChild(del);
+    row.appendChild(actions);
+    commentList.appendChild(row);
+  });
+}
+
+function enterEditMode(comment) {
+  if (!comment) return;
+  editingComment = comment;
+  commentAuthor.value = comment.author || "";
+  commentText.value = comment.comment || "";
+  commentReactions.value = Number.isFinite(comment.numberOfReaction) ? comment.numberOfReaction : "";
+  addCommentBtn.textContent = "Zapisz zmiany";
+  if (editCancelBtn) editCancelBtn.classList.remove("hidden");
+  statusEl.textContent = "Edycja komentarza.";
+}
+
+function exitEditMode() {
+  editingComment = null;
+  addCommentBtn.textContent = "Dodaj komentarz";
+  if (editCancelBtn) editCancelBtn.classList.add("hidden");
+}
+
 async function renderScene(data) {
+  await ensureCanvasFontLoaded();
   const selected = getSelectedPreset();
   const dominant = normalizeColor(selected?.dominantColor || DEFAULT_COLOR);
   const cardColor = normalizeColor(selected?.cardColor || "");
@@ -123,6 +496,7 @@ async function renderScene(data) {
   } else {
     overflowEl.textContent = "";
   }
+  renderCommentList(comments);
 }
 
 async function loadPresets() {
@@ -355,21 +729,21 @@ function drawCommentCard(rect, data, dominant, cardColor, layout) {
   const avatarY = contentY + avatarR;
   drawCircle(avatarX, avatarY, avatarR, adjustColor(dominant, 10));
   ctx.fillStyle = "#ffffff";
-  ctx.font = `bold ${Math.round(14 * scale)}px Trebuchet MS`;
+  ctx.font = buildCanvasFont(Math.round(14 * scale), "bold");
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(getInitials(data.author), avatarX, avatarY);
 
   // Author
   ctx.fillStyle = "#1d2230";
-  ctx.font = `bold ${Math.round(15 * scale)}px Trebuchet MS`;
+  ctx.font = buildCanvasFont(Math.round(15 * scale), "bold");
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.fillText(truncateText(data.author, contentW - 80), contentX + avatarR * 2 + 8, contentY + 2);
 
   // Mini icon
   ctx.fillStyle = adjustColor(dominant, 20);
-  ctx.font = `${Math.round(14 * scale)}px Trebuchet MS`;
+  ctx.font = buildCanvasFont(Math.round(14 * scale));
   ctx.fillText("❖", rect.x + rect.w - pad - 12, contentY + 2);
 
   // Comment
@@ -397,7 +771,7 @@ function drawReactionPill(x, y, icon, count, dominant, scale) {
   ctx.lineWidth = 1;
   drawRoundedRect(x, y, w, h, r, ctx.fillStyle, ctx.strokeStyle);
   ctx.fillStyle = "#1a1f2e";
-  ctx.font = `${Math.round(14 * scale)}px Trebuchet MS`;
+  ctx.font = buildCanvasFont(Math.round(14 * scale));
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText(icon, x + Math.round(8 * scale), y + h / 2 + 1);
@@ -460,7 +834,7 @@ function fitTextBlock(context, text, x, y, maxWidth, maxHeight, scale = 1) {
   for (let i = 0; i < sizes.length; i++) {
     const size = sizes[i];
     const lineHeight = size + 4;
-    context.font = `${size}px Trebuchet MS`;
+    context.font = buildCanvasFont(size);
     if (fitsText(context, text, maxWidth, lineHeight, maxHeight)) {
       wrapText(context, text, x, y, maxWidth, lineHeight, maxHeight);
       return;
@@ -469,7 +843,7 @@ function fitTextBlock(context, text, x, y, maxWidth, maxHeight, scale = 1) {
   // Fallback with smallest size, truncate last line
   const size = sizes[sizes.length - 1];
   const lineHeight = size + 4;
-  context.font = `${size}px Trebuchet MS`;
+  context.font = buildCanvasFont(size);
   const clipped = truncateToFit(context, text, maxWidth, lineHeight, maxHeight);
   wrapText(context, clipped, x, y, maxWidth, lineHeight, maxHeight);
 }
@@ -619,6 +993,7 @@ function rgbToHex(r, g, b) {
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = reject;
     img.src = src;

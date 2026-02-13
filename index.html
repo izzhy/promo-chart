@@ -4,19 +4,40 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Generator Ikonografiki</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ["Manrope", "sans-serif"]
+          },
+          boxShadow: {
+            soft: "0 10px 40px rgba(15, 23, 42, 0.08)"
+          }
+        }
+      }
+    };
+  </script>
 </head>
-<body>
-  <div class="page">
-    <header class="topbar">
+<body class="bg-slate-50 text-slate-900 font-sans dark:bg-slate-950 dark:text-slate-100">
+  <div class="max-w-6xl mx-auto px-5 py-8">
+    <header class="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-white border border-slate-200 shadow-soft p-5 dark:bg-slate-900 dark:border-slate-800">
       <div>
-        <h1>Generator Ikonografiki</h1>
-        <p>Wczytaj lokalny JSON i wygeneruj obraz.</p>
+        <h1 class="text-xl font-semibold tracking-tight">Generator Ikonografiki</h1>
+        <p class="text-sm text-slate-600 dark:text-slate-400">Wczytaj lokalny JSON i wygeneruj obraz.</p>
       </div>
-      <div class="controls">
-        <label class="select">
-          <span>Aspect</span>
-          <select id="aspectSelect">
+      <div class="flex flex-wrap gap-2 items-center">
+        <button id="themeToggle" type="button" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
+          Dark
+        </button>
+        <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
+          <span class="text-slate-600 dark:text-slate-400">Aspect</span>
+          <select id="aspectSelect" class="bg-transparent text-slate-900 outline-none dark:text-slate-100">
             <option value="16:9">16:9</option>
             <option value="4:3">4:3</option>
             <option value="1:1">1:1</option>
@@ -24,34 +45,76 @@
             <option value="9:16">9:16</option>
           </select>
         </label>
-        <label class="select">
-          <span>Kolorystyka</span>
-          <select id="presetSelect"></select>
+        <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
+          <span class="text-slate-600 dark:text-slate-400">Kolorystyka</span>
+          <select id="presetSelect" class="bg-transparent text-slate-900 outline-none dark:text-slate-100"></select>
         </label>
-        <label class="file">
-          <input id="jsonFile" type="file" accept="application/json" />
-          <span>Wybierz JSON</span>
+        <label class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
+          <span class="text-slate-600 dark:text-slate-400">Font ikonografiki</span>
+          <select id="fontSelect" class="bg-transparent text-slate-900 outline-none dark:text-slate-100">
+            <option value="Trebuchet MS">Trebuchet MS</option>
+            <option value="Manrope">Manrope</option>
+            <option value="Segoe UI">Segoe UI</option>
+            <option value="Arial">Arial</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+          </select>
         </label>
-        <button id="renderBtn" type="button">Renderuj</button>
-        <button id="savePng" type="button">Zapisz PNG</button>
-        <button id="saveJpeg" type="button">Zapisz JPEG</button>
+        <label class="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
+          <input id="jsonFile" type="file" accept="application/json" class="hidden" />
+          Wybierz JSON
+        </label>
+        <button id="renderBtn" type="button" class="rounded-xl bg-black px-3 py-2 text-sm text-white hover:opacity-90 dark:bg-white dark:text-black">Renderuj</button>
+        <button id="savePng" type="button" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">Zapisz PNG</button>
+        <button id="saveJpeg" type="button" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">Zapisz JPEG</button>
       </div>
     </header>
 
-    <section class="info">
+    <section class="flex justify-between text-sm text-slate-600 mt-4 dark:text-slate-400">
       <div id="status">Brak wczytanego pliku.</div>
       <div id="overflow"></div>
     </section>
 
-    <section class="dropzone" id="dropzone">
-      <div class="dropzone-inner">
-        <div class="dropzone-title">Przeciągnij i upuść plik JSON tutaj</div>
-        <div class="dropzone-sub">albo użyj przycisku „Wybierz JSON”</div>
+    <section class="mt-4 rounded-2xl bg-white border border-slate-200 shadow-soft p-4 dark:bg-slate-900 dark:border-slate-800">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-slate-600 dark:text-slate-400">Autor</label>
+          <input id="commentAuthor" type="text" placeholder="Anonymous" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs text-slate-600 dark:text-slate-400">Reakcje</label>
+          <input id="commentReactions" type="number" min="0" placeholder="np. 5" class="w-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100" />
+        </div>
+        <button id="addCommentBtn" type="button" class="rounded-xl bg-black px-3 py-2 text-sm text-white hover:opacity-90 dark:bg-white dark:text-black">Dodaj komentarz</button>
+        <button id="editCancelBtn" type="button" class="hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">Anuluj</button>
+      </div>
+      <div class="mt-3">
+        <label class="text-xs text-slate-600 dark:text-slate-400">Treść komentarza</label>
+        <textarea id="commentText" rows="3" placeholder="Wpisz treść komentarza..." class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"></textarea>
       </div>
     </section>
 
-    <section class="canvas-wrap">
-      <canvas id="canvas" width="1920" height="1080"></canvas>
+    <details class="mt-4 rounded-2xl bg-white border border-slate-200 shadow-soft p-4 dark:bg-slate-900 dark:border-slate-800">
+      <summary class="flex cursor-pointer items-center justify-between text-sm font-semibold text-slate-800 dark:text-slate-100">
+        <span>Lista komentarzy</span>
+        <span id="commentCount" class="text-xs text-slate-500 dark:text-slate-400">0</span>
+      </summary>
+      <div id="commentList" class="mt-3 flex flex-col gap-2"></div>
+    </details>
+
+    <section class="mt-3 mb-4 rounded-xl border-2 border-dashed border-slate-200 bg-white p-4 text-center text-slate-600 transition dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400" id="dropzone">
+      <div class="font-semibold text-sm text-slate-800 dark:text-slate-100">Przeciągnij i upuść plik JSON tutaj</div>
+      <div class="text-xs mt-1">albo użyj przycisku „Wybierz JSON”</div>
+    </section>
+
+    <section class="mt-3 mb-4 rounded-xl border-2 border-dashed border-slate-200 bg-white p-4 text-center text-slate-600 transition dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400" id="logoDropzone">
+      <div class="font-semibold text-sm text-slate-800 dark:text-slate-100">Przeciągnij i upuść logo (PNG/JPG/SVG)</div>
+      <div class="text-xs mt-1">logo zostanie osadzone jako data URL</div>
+    </section>
+
+    <section class="rounded-2xl bg-white p-3 shadow-soft border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
+      <canvas id="canvas" width="1920" height="1080" class="w-full h-auto block rounded-xl bg-slate-100 dark:bg-slate-800"></canvas>
     </section>
   </div>
 
